@@ -22,13 +22,7 @@ upsert par SIREN, suppression des doublons globaux, contrôles volumétriques, e
 
 ---
 
-# 2. Pipeline RNE — Vue d’ensemble, architecture et flux
-
-Cette section regroupe en une seule vue cohérente :  
-- le fonctionnement global du pipeline,  
-- les composants techniques utilisés,  
-- le flux de données de bout en bout,  
-- les principales opérations réalisées sur les données RNE.
+# 2. Pipeline RNE 
 
 ## 2.1 Vue d’ensemble du flux de données
 

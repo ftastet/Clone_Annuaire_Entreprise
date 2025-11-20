@@ -129,6 +129,8 @@ Le pipeline suit une chaîne de traitement complète :
 - Copie des immatriculations,
 - Reconstruction des tables dérivées.
 
+---
+
 ## 3. Schéma fonctionnel du pipeline
 ```mermaid
 flowchart TD
@@ -141,6 +143,8 @@ flowchart TD
     F --> G[ETL SIRENE]
     G --> H[Tables SIRENE enrichies]
 ```
+
+---
 
 ## 4. Inputs & Outputs
 ### Inputs
@@ -155,8 +159,9 @@ flowchart TD
 - Tables SIRENE enrichies
 - Notifications Mattermost
 
-## 5. Mapping Source → Cible
+---
 
+## 5. Mapping Source → Cible
 ## 5. Tableau de mapping source → cible
 
 Les tableaux suivants détaillent la correspondance entre les chemins JSON et les colonnes finales (tables `rne.db` qui alimentent ensuite les tables SIRENE).
@@ -230,6 +235,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | Recréation `dirigeant_pp` / `dirigeant_pm` | `db_rne.dirigeant_*` | `dirigeant_*` | Les tables RNE sont lues par chunks, normalisées (`uppercase`, groupby, concaténation des rôles) puis insérées dans la base SIRENE. |
 | Copie `immatriculation` | `db_rne.immatriculation` | `immatriculation` | Duplication stricte (structure + contenu) en une seule requête SQL. |
 
+---
 
 # 6. Finalité & Modèle de données RNE
 

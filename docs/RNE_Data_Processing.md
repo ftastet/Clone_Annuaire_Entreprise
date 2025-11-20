@@ -12,7 +12,16 @@ Cette base est ensuite utilisée dans l’ETL SIRENE pour enrichir les tables di
 
 Des garde-fous — dédoublonnage, upsert par SIREN, contrôles volumétriques, exclusion du dernier fichier de flux, notifications Mattermost — garantissent la cohérence des données.
 
-Le traitement complet s’appuie sur Airflow, MinIO, SQLite, Pydantic, pandas et un client API robuste gérant pagination `searchAfter`, retries et régulation dynamique du `pageSize`.
+Le traitement complet :
+- Airflow : orchestre toutes les tâches du pipeline (télécharger, charger, nettoyer, publier).
+- MinIO : sert de stockage d’objets pour les fichiers bruts et les bases compressées.
+- SQLite : base de données locale utilisée pour structurer et versionner les données RNE.
+- Pydantic : valide chaque JSON RNE pour garantir qu’il respecte le schéma attendu.
+- pandas : sert à nettoyer et dédupliquer les données, notamment les dirigeants.
+- Client API : le code qui appelle l’API RNE est conçu pour être solide :
+    - pagination searchAfter : permet de récupérer les résultats par blocs ordonnés sur le SIREN suivant.
+    - retries : retente automatiquement en cas d’erreur de l’API.
+    - régulation dynamique du pageSize : si l’API renvoie une erreur (ex. 500/memory), le client réduit la taille des pages et retente.
 
 ## 2. Vue d’ensemble du pipeline
 - Acquisition du stock via FTP → MinIO

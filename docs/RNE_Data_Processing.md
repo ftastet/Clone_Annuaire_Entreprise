@@ -2,6 +2,8 @@
 # RNE_Data_Processing
 
 ## 1. Résumé exécutif
+### Overview
+
 Le pipeline RNE industrialise :
 - la collecte du stock initial INPI et des flux différentiels quotidiens
 - les valide via Pydantic,
@@ -12,7 +14,8 @@ Cette base est ensuite utilisée dans l’ETL SIRENE pour enrichir les tables di
 
 Des garde-fous — dédoublonnage, upsert par SIREN, contrôles volumétriques, exclusion du dernier fichier de flux, notifications Mattermost — garantissent la cohérence des données.
 
-Le traitement complet :
+### Traitement complet
+
 - Airflow : orchestre toutes les tâches du pipeline (télécharger, charger, nettoyer, publier).
 - MinIO : sert de stockage d’objets pour les fichiers bruts et les bases compressées.
 - SQLite : base de données locale utilisée pour structurer et versionner les données RNE.

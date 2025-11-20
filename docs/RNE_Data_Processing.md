@@ -2,7 +2,11 @@
 # RNE_Data_Processing
 
 ## 1. Résumé exécutif
-Le pipeline RNE industrialise la collecte du stock initial INPI et des flux différentiels quotidiens, les valide via Pydantic, les normalise et les consolide dans une base SQLite versionnée (`rne_<date>.db.gz`) stockée sur MinIO. 
+Le pipeline RNE industrialise :
+- la collecte du stock initial INPI et des flux différentiels quotidiens
+- les valide via Pydantic,
+- les normalise
+- et les consolide dans une base SQLite versionnée (`rne_<date>.db.gz`) stockée sur MinIO
 
 Cette base est ensuite utilisée dans l’ETL SIRENE pour enrichir les tables dirigeants, unités légales, sièges et immatriculations. 
 

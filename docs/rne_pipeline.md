@@ -58,16 +58,16 @@ La base RNE construite quotidiennement est transférée vers l'ETL SIRENE : le
 
 # Schéma fonctionnel du flux de données
 ```mermaid
-graph TD
-    A[FTP INPI (stock ZIP)] -->|get_stock.sh + RneStockProcessor| B[MinIO rne/stock/]
-    A2[RNE API companies/diff (flux J)] -->|ApiRNEClient + get_every_day_flux| C[MinIO rne/flux/ (.json.gz)]
-    B --> D[Processus fill_rne_database]
-    C --> D
-    D -->|Validation Pydantic + mapping + dédup| E[Base SQLite RNE versionnée]
-    E -->|Compression + versioning| F[MinIO rne/database/ + latest_rne_date.json]
-    F -->|get_rne_database| G[ETL SIRENE SQLite]
-    G -->|Prétraitements pandas + SQL| H[Tables SIRENE enrichies (UL, sièges, dirigeants, immat)]
-    H --> I[Annuaire enrichi + notifications Mattermost]
+flowchart TD
+    A[FTP INPI (stock ZIP)] -->|get_stock.sh + RneStockProcessor| B[MinIO rne/stock/];
+    A2[RNE API companies/diff (flux J)] -->|ApiRNEClient + get_every_day_flux| C[MinIO rne/flux/ (.json.gz)];
+    B --> D[Processus fill_rne_database];
+    C --> D;
+    D -->|Validation Pydantic + mapping + dédup| E[Base SQLite RNE versionnée];
+    E -->|Compression + versioning| F[MinIO rne/database/ + latest_rne_date.json];
+    F -->|get_rne_database| G[ETL SIRENE SQLite];
+    G -->|Prétraitements pandas + SQL| H[Tables SIRENE enrichies (UL, sièges, dirigeants, immat)];
+    H --> I[Annuaire enrichi + notifications Mattermost];
 ```
 
 # Détail des tables de sortie RNE

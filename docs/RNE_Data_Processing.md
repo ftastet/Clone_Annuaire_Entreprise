@@ -1,77 +1,141 @@
 
 # RNE_Data_Processing
 
-## 1. Résumé exécutif
-### Overview
+# 1. Résumé exécutif
 
-Le pipeline RNE industrialise :
-- la collecte du stock initial INPI et des flux différentiels quotidiens
-- les valide via Pydantic,
-- les normalise
-- et les consolide dans une base SQLite versionnée (`rne_<date>.db.gz`) stockée sur MinIO
+Le pipeline RNE industrialise la récupération, la normalisation et la mise à disposition des données du Registre National des Entreprises (RNE) à partir de deux sources officielles :  
+- le **stock annuel INPI** (ZIP contenant l’historique complet),  
+- les **flux quotidiens différentiels** via l’API `companies/diff`.
 
-Cette base est ensuite utilisée dans l’ETL SIRENE pour enrichir les tables dirigeants, unités légales, sièges et immatriculations. 
+Ces données brutes sont stockées sur **MinIO**, validées via **Pydantic**, transformées en tables normalisées dans une base **SQLite versionnée**, puis intégrées dans les tables dirigeant, unité légale, siège et immatriculation de la base **SIRENE** via un ETL dédié.
 
-Des garde-fous — dédoublonnage, upsert par SIREN, contrôles volumétriques, exclusion du dernier fichier de flux, notifications Mattermost — garantissent la cohérence des données.
+Le traitement complète s’appuie sur :  
+- **Airflow** pour l’orchestration,  
+- **MinIO** pour le stockage objet,  
+- **SQLite** pour la consolidation incrémentale versionnée,  
+- **Pydantic** pour la validation stricte des payloads JSON,  
+- **pandas** pour le nettoyage avancé des dirigeants,  
+- un **client API robuste** (pagination `searchAfter`, retries, réduction dynamique du `pageSize`).
 
-### Traitement complet
+Des garde-fous structurés garantissent la cohérence des données :  
+upsert par SIREN, suppression des doublons globaux, contrôles volumétriques, exclusion des journées incomplètes, logs et notifications Mattermost.
 
-- Airflow : orchestre toutes les tâches du pipeline (télécharger, charger, nettoyer, publier).
-- MinIO : sert de stockage d’objets pour les fichiers bruts et les bases compressées.
-- SQLite : base de données locale utilisée pour structurer et versionner les données RNE.
-- Pydantic : valide chaque JSON RNE pour garantir qu’il respecte le schéma attendu.
-- pandas : sert à nettoyer et dédupliquer les données, notamment les dirigeants.
-- Client API : le code qui appelle l’API RNE est conçu pour être solide :
-    - pagination searchAfter : permet de récupérer les résultats par blocs ordonnés sur le SIREN suivant.
-    - retries : retente automatiquement en cas d’erreur de l’API.
-    - régulation dynamique du pageSize : si l’API renvoie une erreur (ex. 500/memory), le client réduit la taille des pages et retente.
+---
 
-## 2. Vue d’ensemble du pipeline
-- Acquisition du stock via FTP → MinIO
-- Collecte quotidienne API RNE → MinIO
-- Construction / reprise de la base SQLite : ingestion du stock et des flux, mapping, nettoyage, versioning
-- Mise à disposition dans MinIO
-- Intégration des données RNE dans la base SIRENE via des opérations SQL + pandas
+# 2. Pipeline RNE — Vue d’ensemble, architecture et flux
 
-## 3. Architecture des composants
-- Airflow : orchestration `get_flux_rne` et `fill_rne_database`
-- MinIO : stockage des données brutes, bases versionnées et métadonnées
-- SQLite : base normalisée `rne_<date>.db`
-- Pydantic : validation des payloads JSON
-- Pandas : nettoyage et consolidation dirigeants
-- API RNE : récupération flux quotidiens via `companies/diff`
+Cette section regroupe en une seule vue cohérente :  
+- le fonctionnement global du pipeline,  
+- les composants techniques utilisés,  
+- le flux de données de bout en bout,  
+- les principales opérations réalisées sur les données RNE.
 
-## 4. Flux de données détaillé
-### Stock initial
-- Téléchargement du ZIP via `get_stock.sh`
-- Extraction JSON → MinIO `rne/stock/`
-- Suppression locale
+## 2.1 Vue d’ensemble du flux de données
 
-### Flux quotidiens
-- Appels API RNE (pagination `searchAfter`, retries)
-- Construction JSON ND → `.gz`
-- Upload MinIO `rne/flux/`
-- Sauvegarde même en cas d’erreur partielle
+Le pipeline suit une chaîne de traitement complète :
 
-### Construction SQLite
-- Récupération `latest_rne_date.json`
-- Reprise ou création `rne_<date>.db`
-- Ingestion stock si reconstruction
-- Ingestion flux (ordre ascendant, dernier fichier ignoré)
-- Validation Pydantic
-- Upsert SIREN
-- Dédoublonnage + VACUUM
-- Vérifications volumétriques
-- Compression + upload MinIO + mise à jour métadonnées
+1. **Acquisition des données brutes**
+   - Téléchargement du **stock INPI** via script shell (`get_stock.sh`), extraction JSON, dépôt sur MinIO (`rne/stock`).
+   - Récupération des **flux quotidiens** via l’API RNE (`companies/diff`) orchestrée par Airflow :
+     - pagination `searchAfter`,
+     - gestion du `pageSize`,
+     - retries automatiques,
+     - stockage en JSON ND compressé (`.json.gz`) dans MinIO (`rne/flux`).
 
-### Intégration SIRENE
-- Attachement de `rne.db`
-- Prétraitements dirigeants
-- UPDATE + INSERT OR IGNORE
-- Copie stricte de la table immatriculation
-- Reconstruction tables dérivées
+2. **Construction / reprise de la base SQLite RNE**
+   - Lecture de `latest_rne_date.json`,
+   - Création ou reprise de `rne_<date>.db`,
+   - Ingestion du stock (lors du bootstrap) puis des flux (ordre chronologique, dernier flux ignoré),
+   - Validation Pydantic (`RNECompany`),
+   - Mapping vers les tables internes (UL, siège, dirigeants, immatriculation, établissements, activités),
+   - Nettoyage : upsert par SIREN, suppression des doublons, `VACUUM`,
+   - Contrôles volumétriques (ex. ~20M UL).
 
-## 5. Schéma fonctionnel du pipeline
+3. **Versioning et publication**
+   - Compression de la base,
+   - Dépôt sur MinIO (`rne/database`),
+   - Mise à jour de `latest_rne_date.json`.
+
+4. **Intégration dans l’ETL SIRENE**
+   - Téléchargement de la base RNE versionnée,
+   - Prétraitements pandas sur les dirigeants,
+   - Mise à jour des tables UL et sièges via `UPDATE` puis `INSERT OR IGNORE`,
+   - Copie directe de la table immatriculation,
+   - Reconstruction des tables dérivées.
+
+## 2.2 Architecture des composants
+
+### Airflow
+- Orchestration complète du processus via deux DAGs :
+  - `get_flux_rne` : collecte des flux quotidiens,
+  - `fill_rne_database` : construction incrémentale de la base SQLite.
+- Nettoyage automatique, gestion du séquencement, gestion des erreurs.
+
+### MinIO
+- Stockage durable des artefacts :
+  - `rne/stock/` : stock JSON initial,
+  - `rne/flux/` : flux journaliers `.json.gz`,
+  - `rne/database/` : bases versionnées,
+  - `latest_rne_date.json` : métadonnées de reprise.
+
+### SQLite
+- Base locale normalisée regroupant les 7 tables cibles :
+  - `unite_legale`, `siege`, `dirigeant_pp`, `dirigeant_pm`,  
+    `immatriculation`, `etablissement`, `activite`.
+- Index sur SIREN/SIRET,
+- Versioning complet via upload `.gz`.
+
+### Pydantic
+- Validation stricte de chaque payload JSON RNE via `RNECompany`,
+- Garantit la structure source avant toute transformation.
+
+### pandas
+- Nettoyage des dirigeants (PP/PM) :
+  - tri,
+  - dédoublonnage,
+  - uniformisation de la casse,
+  - regroupement de rôles.
+
+### Client API RNE
+- Gestion de la pagination `searchAfter`,
+- Réduction automatique du `pageSize` si erreur 500,
+- Retries automatiques,
+- Authentification par token.
+
+## 2.3 Flux de traitement détaillé
+
+### a) Stock initial
+- Téléchargement ZIP via FTP,
+- Extraction JSON,
+- Upload MinIO,
+- Suppression locale immédiate.
+
+### b) Flux quotidien
+- Appels API RNE pour chaque date « dernière date traitée → J-1 »,
+- Pagination ordonnée par SIREN,
+- JSON ND concaténé + compression,
+- Upload MinIO même en cas d’erreur partielle.
+
+### c) Construction / mise à jour SQLite
+- Reprise d’une version existante si disponible,
+- Ingestion du stock (si nouveau pipeline),
+- Ingestion chronologique des flux,
+- Normalisation via mapping interne,
+- Upsert par SIREN,
+- Dédoublonnage, `VACUUM`, indexation.
+
+### d) Versioning
+- Compression `.gz`,
+- Dépôt MinIO `rne/database/`,
+- Mise à jour `latest_rne_date.json`.
+
+### e) Intégration SIRENE
+- Prétraitements dirigeants,
+- Mise à jour UL et siège,
+- Copie des immatriculations,
+- Reconstruction des tables dérivées.
+
+## 3. Schéma fonctionnel du pipeline
 ```mermaid
 flowchart TD
     A[FTP INPI] --> B[MinIO rne/stock/]
@@ -84,7 +148,7 @@ flowchart TD
     G --> H[Tables SIRENE enrichies]
 ```
 
-## 6. Inputs & Outputs
+## 4. Inputs & Outputs
 ### Inputs
 - Stock historique INPI ZIP → JSON
 - Flux différentiel quotidien `.json.gz`
@@ -97,13 +161,13 @@ flowchart TD
 - Tables SIRENE enrichies
 - Notifications Mattermost
 
-## 7. Mapping Source → Cible
+## 5. Mapping Source → Cible
 
-## 7. Tableau de mapping source → cible
+## 5. Tableau de mapping source → cible
 
 Les tableaux suivants détaillent la correspondance entre les chemins JSON et les colonnes finales (tables `rne.db` qui alimentent ensuite les tables SIRENE).
 
-### 7.1 `unite_legale`
+### 5.1 `unite_legale`
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -126,7 +190,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `composition` ou `identite.entrepreneur` | `dirigeant_pp` / `dirigeant_pm` | voir §3.3 | cf. ci-dessous | cf. ci-dessous | cf. ci-dessous |
 | `etablissementPrincipal` + `autresEtablissements` | `siege`, `etablissement`, `activite` | voir §3.2 | cf. ci-dessous | cf. ci-dessous | cf. ci-dessous |
 
-### 7.2 `siege`, `etablissement` et `activite`
+### 5.2 `siege`, `etablissement` et `activite`
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -138,7 +202,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `autresEtablissements[].activites[]` | `activite` | mêmes colonnes | TEXT/BOOL/DATE | Même logique que pour le siège. | |
 | `activites[].formeExercice` + indicateur principal | `immatriculation` | `nature_entreprise` | TEXT | `get_nature_entreprise_list` construit un set (forme principale + activités principales des établissements) puis il est sérialisé en JSON. | Champ multi-source, peut être nul si aucun indicateur principal n’est renseigné. |
 
-### 7.3 Dirigeants
+### 5.3 Dirigeants
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -148,7 +212,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `dirigeants` (tous types) | `unite_legale` | `nom`, `nom_usage`, `prenom` | TEXT | Pour les personnes physiques, la première ligne de dirigeant est recopiée sur l’UL afin de disposer d’un triplet nom/prénom. | Permet de distinguer les entreprises individuelles dans la base SIRENE. |
 | `updatedAt` + `file_path` | `dirigeant_pp`/`dirigeant_pm` | `date_mise_a_jour`, `file_name` | DATE/TEXT | Ajoutés lors de l’insertion dans SQLite. | Utilisés ensuite pour le nettoyage et la traçabilité. |
 
-### 7.4 Immatriculation
+### 5.4 Immatriculation
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -163,7 +227,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `identite.entreprise.dateDebutActiv` | `immatriculation` | `date_debut_activite` | TEXT | Copie directe. | |
 | `nature_entreprise` (set issu des formes d’exercice) | `immatriculation` | `nature_entreprise` | TEXT | Sérialisation JSON (`json.dumps`) de la liste construite par `get_nature_entreprise_list`. | Multi-sources (activité principale, sièges, établissements). |
 
-### 7.5 Mise à jour SIRENE et traitements complémentaires
+### 5.5 Mise à jour SIRENE et traitements complémentaires
 
 | Étape | Source JSON / table RNE | Table SIRENE cible | Transformation / logique |
 | --- | --- | --- | --- |
@@ -173,16 +237,16 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | Copie `immatriculation` | `db_rne.immatriculation` | `immatriculation` | Duplication stricte (structure + contenu) en une seule requête SQL. |
 
 ---
-## 8. Artefacts générés
+## 6. Artefacts générés
 - `stock_rne.json` (sur MinIO)
 - `rne_flux_YYYY-MM-DD.json.gz`
 - `rne_<date>.db` local + version `.gz` sur MinIO
 - `latest_rne_date.json`
 - Tables SIRENE enrichies
 
-## 9. Réutilisabilité du pipeline
+## 7. Réutilisabilité du pipeline
 *Section à compléter manuellement.*
 
-## 10. Limites techniques / risques
+## 8. Limites techniques / risques
 *Section vide comme demandé.*
 

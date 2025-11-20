@@ -6,7 +6,7 @@ Ce document synthétise la structure des JSON RNE (stock et flux), les tables SQ
 
 ## 1. Variables d’entrée (JSON RNE)
 
-Les modèles définis dans `rne_model.py` décrivent l’intégralité du schéma JSON fourni par la source RNE. Les tableaux ci‑dessous listent les champs par grande famille avec leur type attendu et leur signification fonctionnelle.【F:workflows/data_pipelines/rne/database/rne_model.py†L6-L210】
+Les modèles définis dans `rne_model.py` décrivent l’intégralité du schéma JSON fourni par la source RNE. Les tableaux ci‑dessous listent les champs par grande famille avec leur type attendu et leur signification fonctionnelle.
 
 ### 1.1 Métadonnées globales et formalités
 
@@ -97,7 +97,7 @@ Les modèles définis dans `rne_model.py` décrivent l’intégralité du schém
 
 ### 2.1 Tables RNE (`rne.db`)
 
-Les tables créées dans `process_rne.py` capturent l’ensemble des informations mappées via `map_rne_company_to_ul`. Les colonnes et leur rôle sont listés ci‑dessous.【F:workflows/data_pipelines/rne/database/process_rne.py†L18-L190】【F:workflows/data_pipelines/rne/database/process_rne.py†L260-L640】
+Les tables créées dans `process_rne.py` capturent l’ensemble des informations mappées via `map_rne_company_to_ul`. Les colonnes et leur rôle sont listés ci‑dessous.
 
 #### `unite_legale`
 
@@ -193,11 +193,11 @@ Les tables créées dans `process_rne.py` capturent l’ensemble des information
 
 | Table SIRENE | Champs alimentés | Mode d’alimentation |
 | --- | --- | --- |
-| `unite_legale` | `from_rne`, `date_mise_a_jour_rne`, et toutes les colonnes renseignées lors de l’insertion `INSERT OR IGNORE` (date de création, noms, natures juridiques, tranche d’effectif, etc.) | `add_rne_siren_data_to_unite_legale_table` attache `rne.db`, met à jour les drapeaux puis insère les lignes manquantes depuis `db_rne.unite_legale`.【F:workflows/data_pipelines/etl/task_functions/create_unite_legale_tables.py†L128-L156】【F:workflows/data_pipelines/etl/sqlite/queries/unite_legale.py†L27-L174】 |
-| `siege` | `date_mise_a_jour_rne` (pour les lignes existantes) et un bloc de colonnes d’adresse (numéro/type de voie, commune, code postal, etc.) lors de l’insertion des nouveaux sièges. | `add_rne_data_to_siege_table` applique `update_siege_table_fields_with_rne_data_query` puis `insert_remaining_rne_siege_data_into_main_table_query`.【F:workflows/data_pipelines/etl/task_functions/create_etablissements_tables.py†L165-L195】【F:workflows/data_pipelines/etl/sqlite/queries/etablissements.py†L411-L464】 |
-| `dirigeant_pp` | Colonnes identitaires consolidées + `role_description`. | Les tables SIRENE sont regénérées à partir de `rne.db` en chunks et nettoyées via `preprocess_personne_physique`. Les noms/prénoms sont mis en majuscules, les doublons supprimés et les codes rôles convertis en libellés. 【F:workflows/data_pipelines/etl/task_functions/create_dirig_tables.py†L53-L112】【F:workflows/data_pipelines/etl/data_fetch_clean/dirigeants.py†L11-L69】 |
-| `dirigeant_pm` | `siren`, `siren_dirigeant`, `denomination`, `role_description`. | Même logique que ci-dessus avec `preprocess_dirigeant_pm` (suppression des `NaN`, upper-case, agrégation des rôles).【F:workflows/data_pipelines/etl/task_functions/create_dirig_tables.py†L83-L112】【F:workflows/data_pipelines/etl/data_fetch_clean/dirigeants.py†L71-L104】 |
-| `immatriculation` | Table recopiée intégralement (structure + contenu). | `copy_immatriculation_table` crée la table dans la base SIRENE puis copie toutes les lignes distinctes de `db_rne.immatriculation`.【F:workflows/data_pipelines/etl/task_functions/create_immatriculation_table.py†L10-L46】 |
+| `unite_legale` | `from_rne`, `date_mise_a_jour_rne`, et toutes les colonnes renseignées lors de l’insertion `INSERT OR IGNORE` (date de création, noms, natures juridiques, tranche d’effectif, etc.) | `add_rne_siren_data_to_unite_legale_table` attache `rne.db`, met à jour les drapeaux puis insère les lignes manquantes depuis `db_rne.unite_legale`. |
+| `siege` | `date_mise_a_jour_rne` (pour les lignes existantes) et un bloc de colonnes d’adresse (numéro/type de voie, commune, code postal, etc.) lors de l’insertion des nouveaux sièges. | `add_rne_data_to_siege_table` applique `update_siege_table_fields_with_rne_data_query` puis `insert_remaining_rne_siege_data_into_main_table_query`. |
+| `dirigeant_pp` | Colonnes identitaires consolidées + `role_description`. | Les tables SIRENE sont regénérées à partir de `rne.db` en chunks et nettoyées via `preprocess_personne_physique`. Les noms/prénoms sont mis en majuscules, les doublons supprimés et les codes rôles convertis en libellés.  |
+| `dirigeant_pm` | `siren`, `siren_dirigeant`, `denomination`, `role_description`. | Même logique que ci-dessus avec `preprocess_dirigeant_pm` (suppression des `NaN`, upper-case, agrégation des rôles). |
+| `immatriculation` | Table recopiée intégralement (structure + contenu). | `copy_immatriculation_table` crée la table dans la base SIRENE puis copie toutes les lignes distinctes de `db_rne.immatriculation`. |
 
 ---
 
@@ -209,9 +209,9 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
-| `siren` | `unite_legale` | `siren` | TEXT | Affectation directe par `map_rne_company_to_ul`. | Sert aussi de clé primaire pour les suppressions de doublons avant insertion.【F:workflows/data_pipelines/rne/database/map_rne.py†L20-L67】【F:workflows/data_pipelines/rne/database/process_rne.py†L270-L343】 |
+| `siren` | `unite_legale` | `siren` | TEXT | Affectation directe par `map_rne_company_to_ul`. | Sert aussi de clé primaire pour les suppressions de doublons avant insertion. |
 | `formality.diffusionINSEE` | `unite_legale` | `statut_diffusion` | TEXT | Copie directe. | Propagé plus tard dans SIRENE (`statut_diffusion_unite_legale`). |
-| `formality.formeJuridique`, `content.natureCreation.formeJuridique`, `identite.entreprise.formeJuridique/formeJuridiqueInsee` | `unite_legale` | `nature_juridique` | TEXT | `get_forme_juridique` priorise la forme issue de la formalité, sinon nature de création, sinon identite. | Combine plusieurs sources pour fiabiliser la forme juridique.【F:workflows/data_pipelines/rne/database/map_rne.py†L24-L67】【F:workflows/data_pipelines/rne/database/map_rne.py†L144-L157】 |
+| `formality.formeJuridique`, `content.natureCreation.formeJuridique`, `identite.entreprise.formeJuridique/formeJuridiqueInsee` | `unite_legale` | `nature_juridique` | TEXT | `get_forme_juridique` priorise la forme issue de la formalité, sinon nature de création, sinon identite. | Combine plusieurs sources pour fiabiliser la forme juridique. |
 | `createdAt` ou `content.natureCreation.dateCreation` | `unite_legale` | `date_creation` | TEXT | `get_date_creation` choisit `createdAt` puis la date de création déclarée. | Format conservé tel que fourni. |
 | `formality.content.formeExerciceActivitePrincipale` | `unite_legale` | `forme_exercice_activite_principale` | TEXT | Copie directe. | Sert aussi de première valeur pour la nature d’entreprise (voir immatriculation). |
 | `formality.content.natureCessationEntreprise.etatAdministratifInsee` | `unite_legale` | `etat_administratif` | TEXT | Copie directe. | |
@@ -224,7 +224,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `identite.description.{montantCapital, capitalVariable, deviseCapital, dateClotureExerciceSocial, duree}` | `immatriculation` | `capital_social`, `capital_variable`, `devise_capital`, `date_cloture_exercice`, `duree_personne_morale` | REAL/TEXT/INT | Copie directe. | |
 | `detailCessationEntreprise.{dateRadiation, dateEffet, dateCessationTotaleActivite}` | `immatriculation` | `date_radiation` | DATE | Première date non nulle (radiation > effet > cessation). | Valeur priorisée via `get_detail_cessation`. |
 | `updatedAt` | Toutes tables | `date_mise_a_jour` | DATE | Affecté à `unite_legale.date_mise_a_jour` et réutilisé lors de l’insertion des enfants (`siege`, `dirigeant_*`, `etablissement`, `activite`, `immatriculation`). | Permet un suivi temporel homogène. |
-| `adresseEntreprise.adresse.*` | `unite_legale` | `adresse` | TEXT | Les champs structurés sont convertis en objet `Adresse` puis concaténés via `format_address()`. | Prépare l’export SIRENE et ElasticSearch.【F:workflows/data_pipelines/rne/database/map_rne.py†L69-L91】【F:workflows/data_pipelines/rne/database/ul_model.py†L89-L120】 |
+| `adresseEntreprise.adresse.*` | `unite_legale` | `adresse` | TEXT | Les champs structurés sont convertis en objet `Adresse` puis concaténés via `format_address()`. | Prépare l’export SIRENE et ElasticSearch. |
 | `composition` ou `identite.entrepreneur` | `dirigeant_pp` / `dirigeant_pm` | voir §3.3 | cf. ci-dessous | cf. ci-dessous | cf. ci-dessous |
 | `etablissementPrincipal` + `autresEtablissements` | `siege`, `etablissement`, `activite` | voir §3.2 | cf. ci-dessous | cf. ci-dessous | cf. ci-dessous |
 
@@ -234,20 +234,20 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | --- | --- | --- | --- | --- | --- |
 | `etablissementPrincipal.descriptionEtablissement.siret` | `siege` | `siret` | TEXT | Copie directe. | Sert aussi de clé pour les activités de siège. |
 | `etablissementPrincipal.descriptionEtablissement.{nomCommercial, enseigne}` | `siege` | `nom_commercial`, `enseigne` | TEXT | Copie directe. | |
-| `etablissementPrincipal.adresse.{...}` | `siege` | Colonnes d’adresse | TEXT | Mapping champ à champ via `map_rne_siege_to_ul`. | Toutes les composantes sont injectées (pays, code INSEE, etc.).【F:workflows/data_pipelines/rne/database/map_rne.py†L256-L280】 |
+| `etablissementPrincipal.adresse.{...}` | `siege` | Colonnes d’adresse | TEXT | Mapping champ à champ via `map_rne_siege_to_ul`. | Toutes les composantes sont injectées (pays, code INSEE, etc.). |
 | `etablissementPrincipal.activites[]` | `activite` | Colonnes `code_category`, `indicateur_*`, `date_debut`, `form_exercice`, `categorisation_*`, `code_ape`, `activite_rattachee_eirl` | TEXT/BOOL/DATE | Chaque activité devient une ligne `activite` avec `siret = siret_du_siege`. | La date de mise à jour provient d’`updatedAt`. |
-| `autresEtablissements[].descriptionEtablissement.siret` | `etablissement` | `siret` | TEXT | Copie directe. | Les activités associées héritent du même SIRET.【F:workflows/data_pipelines/rne/database/map_rne.py†L306-L329】 |
+| `autresEtablissements[].descriptionEtablissement.siret` | `etablissement` | `siret` | TEXT | Copie directe. | Les activités associées héritent du même SIRET. |
 | `autresEtablissements[].activites[]` | `activite` | mêmes colonnes | TEXT/BOOL/DATE | Même logique que pour le siège. | |
-| `activites[].formeExercice` + indicateur principal | `immatriculation` | `nature_entreprise` | TEXT | `get_nature_entreprise_list` construit un set (forme principale + activités principales des établissements) puis il est sérialisé en JSON. | Champ multi-source, peut être nul si aucun indicateur principal n’est renseigné.【F:workflows/data_pipelines/rne/database/map_rne.py†L107-L138】【F:workflows/data_pipelines/rne/database/process_rne.py†L565-L601】 |
+| `activites[].formeExercice` + indicateur principal | `immatriculation` | `nature_entreprise` | TEXT | `get_nature_entreprise_list` construit un set (forme principale + activités principales des établissements) puis il est sérialisé en JSON. | Champ multi-source, peut être nul si aucun indicateur principal n’est renseigné. |
 
 ### 3.3 Dirigeants
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
-| `composition.pouvoirs[].typeDePersonne == "INDIVIDU"` | `dirigeant_pp` | colonnes identitaires | TEXT | `map_rne_dirigeant_pp_to_ul` recopie les champs `nom`, `nomUsage`, `prenoms`, `genre`, `dateDeNaissance`, `nationalite`, `situationMatrimoniale`. Les listes de prénoms sont jointes avec un espace. | Le rôle stocké est `roleEntreprise`.【F:workflows/data_pipelines/rne/database/map_rne.py†L230-L244】 |
+| `composition.pouvoirs[].typeDePersonne == "INDIVIDU"` | `dirigeant_pp` | colonnes identitaires | TEXT | `map_rne_dirigeant_pp_to_ul` recopie les champs `nom`, `nomUsage`, `prenoms`, `genre`, `dateDeNaissance`, `nationalite`, `situationMatrimoniale`. Les listes de prénoms sont jointes avec un espace. | Le rôle stocké est `roleEntreprise`. |
 | `composition.pouvoirs[].typeDePersonne == "ENTREPRISE"` | `dirigeant_pm` | `siren_dirigeant`, `denomination`, `role`, `pays`, `forme_juridique` | TEXT | `map_rne_dirigeant_pm_to_ul` nettoie le SIREN (suppression des espaces) et recopie les autres champs. | |
-| `personnePhysique.identite.entrepreneur.descriptionPersonne` (cas personne physique sans composition) | `dirigeant_pp` | mêmes colonnes | TEXT | `get_dirigeants` renvoie une liste avec l’entrepreneur individuel. | Les champs rôle restent `None`.【F:workflows/data_pipelines/rne/database/map_rne.py†L203-L304】 |
-| `dirigeants` (tous types) | `unite_legale` | `nom`, `nom_usage`, `prenom` | TEXT | Pour les personnes physiques, la première ligne de dirigeant est recopiée sur l’UL afin de disposer d’un triplet nom/prénom. | Permet de distinguer les entreprises individuelles dans la base SIRENE.【F:workflows/data_pipelines/rne/database/map_rne.py†L167-L175】 |
+| `personnePhysique.identite.entrepreneur.descriptionPersonne` (cas personne physique sans composition) | `dirigeant_pp` | mêmes colonnes | TEXT | `get_dirigeants` renvoie une liste avec l’entrepreneur individuel. | Les champs rôle restent `None`. |
+| `dirigeants` (tous types) | `unite_legale` | `nom`, `nom_usage`, `prenom` | TEXT | Pour les personnes physiques, la première ligne de dirigeant est recopiée sur l’UL afin de disposer d’un triplet nom/prénom. | Permet de distinguer les entreprises individuelles dans la base SIRENE. |
 | `updatedAt` + `file_path` | `dirigeant_pp`/`dirigeant_pm` | `date_mise_a_jour`, `file_name` | DATE/TEXT | Ajoutés lors de l’insertion dans SQLite. | Utilisés ensuite pour le nettoyage et la traçabilité. |
 
 ### 3.4 Immatriculation
@@ -296,7 +296,7 @@ Les champs suivants sont définis dans les modèles Pydantic mais ne sont jamais
 | `AdresseEntreprise.{caracteristiques, entrepriseDomiciliataire}` | dict | non | Ignorés lors du mapping d’adresse. |
 | `DescriptionPersonne.titre`, `DescriptionPersonne.role` | string | non | Les titres/ rôles textuels ne sont pas recopiés. |
 
-【F:workflows/data_pipelines/rne/database/rne_model.py†L6-L210】
+
 
 ---
 

@@ -230,17 +230,76 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | Recréation `dirigeant_pp` / `dirigeant_pm` | `db_rne.dirigeant_*` | `dirigeant_*` | Les tables RNE sont lues par chunks, normalisées (`uppercase`, groupby, concaténation des rôles) puis insérées dans la base SIRENE. |
 | Copie `immatriculation` | `db_rne.immatriculation` | `immatriculation` | Duplication stricte (structure + contenu) en une seule requête SQL. |
 
----
-## 6. Artefacts générés
-- `stock_rne.json` (sur MinIO)
-- `rne_flux_YYYY-MM-DD.json.gz`
-- `rne_<date>.db` local + version `.gz` sur MinIO
-- `latest_rne_date.json`
-- Tables SIRENE enrichies
 
-## 7. Réutilisabilité du pipeline
+# 6. Finalité & Modèle de données RNE
+
+## 6.1 Finalité fonctionnelle
+- Produire une base RNE normalisée et exploitable.  
+- Aligner les données INPI et les données INSEE.  
+- Assurer une fraîcheur quotidienne.  
+- Versionner la base pour reconstitution et audit.  
+- Alimenter l’annuaire SIRENE.
+
+## 6.2 Tables finales et nombre de champs
+
+| Table | Nb champs |
+|-------|-----------|
+| unite_legale | 16 |
+| siege | 17 |
+| dirigeant_pp | 11 |
+| dirigeant_pm | 8 |
+| immatriculation | 13 |
+| etablissement | 4 |
+| activite | 15 |
+
+Total : **84 champs**.
+
+## 6.3 Description fonctionnelle des tables
+
+### unite_legale (16 champs)
+Identité de l’unité légale : siren, dénomination, nom, prénom, dates, activité principale, tranche effectif, adresse normalisée, statut diffusion.
+
+### siege (17 champs)
+Détails du siège social : siret, enseigne, nom commercial, adresse complète normalisée, pays, code postal, commune, voie, date mise à jour.
+
+### dirigeant_pp (11 champs)
+Personnes physiques : nom, usage, prénoms, genre, nationalité, situation matrimoniale, date naissance, rôle.
+
+### dirigeant_pm (8 champs)
+Personnes morales dirigeantes : siren dirigeant, dénomination, pays, rôle, forme juridique.
+
+### immatriculation (13 champs)
+Informations juridiques : date immatriculation, radiation, capital, devise, durée personne morale, nature entreprise, date début activité.
+
+### etablissement (4 champs)
+Établissements secondaires : siren, siret, date mise à jour.
+
+### activite (15 champs)
+Activités : code APE, catégories, indicateur principal/prolongement, date début, formes d’exercice.
+
+---
+
+# 7. Artefacts
+
+## Liste des artefacts
+- Stock JSON (`rne/stock/`)  
+- Flux `.json.gz` (`rne/flux/`)  
+- Base locale SQLite temporaire  
+- Base versionnée `rne_<date>.db.gz` (`rne/database/`)  
+- Métadonnées `latest_rne_date.json`  
+- Tables enrichies SIRENE
+
+## Utilité
+- Comprendre ce qui est produit automatiquement.  
+- Savoir ce que consomme l’ETL SIRENE.  
+- Identifier les fichiers à monitorer.  
+- Comprendre comment reconstruire ou débugger une exécution.
+
+---
+
+## 8. Réutilisabilité du pipeline
 *Section à compléter manuellement.*
 
-## 8. Limites techniques / risques
+## 9. Limites techniques / risques
 *Section vide comme demandé.*
 

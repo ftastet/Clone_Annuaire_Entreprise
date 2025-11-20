@@ -2,6 +2,26 @@
 
 Ce document inventorie les tables finales produites par les pipelines RNE et SIRENE, puis détaille pour chaque table les champs cibles et leurs correspondances (source, type, transformations).
 
+### Champs avec double provenance (RNE **et** SIRENE)
+
+- **`unite_legale`** : `nom`, `nom_usage`, `prenom` (personnes physiques) proviennent des identités RNE et des colonnes d'identité SIRENE.
+- **`siege`** : `siren`, `siret`, les noms/enseignes et l'ensemble des colonnes d'adresse sont remplis par les sièges RNE et par les enregistrements SIRENE filtrés avec `estSiege = 1`.
+- **`etablissement`** : `siren`, `siret` (établissements secondaires) sont alimentés par les blocs `autresEtablissements` RNE et par les lignes établissement SIRENE.
+
+### Mécanique de fusion et règles de priorité
+
+1. **Chargement initial SIRENE** : les stocks/flux CSV créent les tables `unite_legale`, `siege` et `etablissement` avec un indicateur `from_insee = TRUE`.
+2. **Attache de la base RNE** : la base SQLite RNE est attachée à celle de SIRENE ; les tâches d'ETL exécutent des `INSERT OR IGNORE`/upserts depuis RNE vers les tables cibles.
+3. **Priorité implicite RNE** : lorsqu'une donnée RNE existe, elle remplace ou complète la valeur SIRENE sur les champs communs ; les lignes uniquement présentes dans RNE sont ajoutées.
+4. **Traçabilité** : les colonnes `from_rne` et `date_mise_a_jour_rne` sont mises à jour lors de cette phase pour signaler les enregistrements enrichis ou rafraîchis par RNE.
+5. **Unicité** : cette stratégie garantit une seule ligne par SIREN/SIRET dans les tables finales, sans doublons simultanés de sources différentes.
+
+#### Pourquoi une base intermédiaire `db_rne` ?
+
+- **Normalisation en amont** : les JSON RNE sont d'abord convertis en une base SQLite autonome (`rne.db`). Certaines tables sont nettoyées (uppercases, regroupement des rôles, dédoublonnage) avant toute fusion.
+- **Attache maîtrisée** : cette base est ensuite montée en base secondaire (`ATTACH DATABASE ... AS db_rne`) sur la base SIRENE pour exécuter les `INSERT OR IGNORE`/`UPDATE`. Cela évite de charger l'intégralité des flux RNE en mémoire et limite les écritures aux seules jointures SQL nécessaires.
+- **Reproductibilité** : disposer d'un artefact SQLite intermédiaire permet de relancer la fusion ou de rejouer des étapes spécifiques sans retraiter les JSON bruts.
+
 ## Liste des tables finales
 
 - `unite_legale`

@@ -2,7 +2,10 @@
 # RNE_Data_Processing
 
 ## 1. Résumé exécutif
-Le pipeline RNE industrialise la collecte du stock initial INPI et des flux différentiels quotidiens, les valide via Pydantic, les normalise et les consolide dans une base SQLite versionnée (`rne_<date>.db.gz`) stockée sur MinIO. Cette base est ensuite utilisée dans l’ETL SIRENE pour enrichir les tables dirigeants, unités légales, sièges et immatriculations. Des garde-fous — dédoublonnage, upsert par SIREN, contrôles volumétriques, exclusion du dernier fichier de flux, notifications Mattermost — garantissent la cohérence des données. Le traitement complet s’appuie sur Airflow, MinIO, SQLite, Pydantic, pandas et un client API robuste gérant pagination `searchAfter`, retries et régulation dynamique du `pageSize`.
+Le pipeline RNE industrialise la collecte du stock initial INPI et des flux différentiels quotidiens, les valide via Pydantic, les normalise et les consolide dans une base SQLite versionnée (`rne_<date>.db.gz`) stockée sur MinIO. 
+Cette base est ensuite utilisée dans l’ETL SIRENE pour enrichir les tables dirigeants, unités légales, sièges et immatriculations. 
+Des garde-fous — dédoublonnage, upsert par SIREN, contrôles volumétriques, exclusion du dernier fichier de flux, notifications Mattermost — garantissent la cohérence des données. 
+Le traitement complet s’appuie sur Airflow, MinIO, SQLite, Pydantic, pandas et un client API robuste gérant pagination `searchAfter`, retries et régulation dynamique du `pageSize`.
 
 ## 2. Vue d’ensemble du pipeline
 - Acquisition du stock via FTP → MinIO
@@ -77,11 +80,11 @@ flowchart TD
 
 ## 7. Mapping Source → Cible
 
-## 3. Tableau de mapping source → cible
+## 7. Tableau de mapping source → cible
 
 Les tableaux suivants détaillent la correspondance entre les chemins JSON et les colonnes finales (tables `rne.db` qui alimentent ensuite les tables SIRENE).
 
-### 3.1 `unite_legale`
+### 7.1 `unite_legale`
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -104,7 +107,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `composition` ou `identite.entrepreneur` | `dirigeant_pp` / `dirigeant_pm` | voir §3.3 | cf. ci-dessous | cf. ci-dessous | cf. ci-dessous |
 | `etablissementPrincipal` + `autresEtablissements` | `siege`, `etablissement`, `activite` | voir §3.2 | cf. ci-dessous | cf. ci-dessous | cf. ci-dessous |
 
-### 3.2 `siege`, `etablissement` et `activite`
+### 7.2 `siege`, `etablissement` et `activite`
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -116,7 +119,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `autresEtablissements[].activites[]` | `activite` | mêmes colonnes | TEXT/BOOL/DATE | Même logique que pour le siège. | |
 | `activites[].formeExercice` + indicateur principal | `immatriculation` | `nature_entreprise` | TEXT | `get_nature_entreprise_list` construit un set (forme principale + activités principales des établissements) puis il est sérialisé en JSON. | Champ multi-source, peut être nul si aucun indicateur principal n’est renseigné. |
 
-### 3.3 Dirigeants
+### 7.3 Dirigeants
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -126,7 +129,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `dirigeants` (tous types) | `unite_legale` | `nom`, `nom_usage`, `prenom` | TEXT | Pour les personnes physiques, la première ligne de dirigeant est recopiée sur l’UL afin de disposer d’un triplet nom/prénom. | Permet de distinguer les entreprises individuelles dans la base SIRENE. |
 | `updatedAt` + `file_path` | `dirigeant_pp`/`dirigeant_pm` | `date_mise_a_jour`, `file_name` | DATE/TEXT | Ajoutés lors de l’insertion dans SQLite. | Utilisés ensuite pour le nettoyage et la traçabilité. |
 
-### 3.4 Immatriculation
+### 7.4 Immatriculation
 
 | Source JSON | Table cible | Champ cible | Type cible | Transformation / logique | Commentaires |
 | --- | --- | --- | --- | --- | --- |
@@ -141,7 +144,7 @@ Les tableaux suivants détaillent la correspondance entre les chemins JSON et le
 | `identite.entreprise.dateDebutActiv` | `immatriculation` | `date_debut_activite` | TEXT | Copie directe. | |
 | `nature_entreprise` (set issu des formes d’exercice) | `immatriculation` | `nature_entreprise` | TEXT | Sérialisation JSON (`json.dumps`) de la liste construite par `get_nature_entreprise_list`. | Multi-sources (activité principale, sièges, établissements). |
 
-### 3.5 Mise à jour SIRENE et traitements complémentaires
+### 7.5 Mise à jour SIRENE et traitements complémentaires
 
 | Étape | Source JSON / table RNE | Table SIRENE cible | Transformation / logique |
 | --- | --- | --- | --- |

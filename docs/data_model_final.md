@@ -16,6 +16,12 @@ Ce document inventorie les tables finales produites par les pipelines RNE et SIR
 4. **Traçabilité** : les colonnes `from_rne` et `date_mise_a_jour_rne` sont mises à jour lors de cette phase pour signaler les enregistrements enrichis ou rafraîchis par RNE.
 5. **Unicité** : cette stratégie garantit une seule ligne par SIREN/SIRET dans les tables finales, sans doublons simultanés de sources différentes.
 
+#### Pourquoi une base intermédiaire `db_rne` ?
+
+- **Normalisation en amont** : les JSON RNE sont d'abord convertis en une base SQLite autonome (`rne.db`). Certaines tables sont nettoyées (uppercases, regroupement des rôles, dédoublonnage) avant toute fusion.
+- **Attache maîtrisée** : cette base est ensuite montée en base secondaire (`ATTACH DATABASE ... AS db_rne`) sur la base SIRENE pour exécuter les `INSERT OR IGNORE`/`UPDATE`. Cela évite de charger l'intégralité des flux RNE en mémoire et limite les écritures aux seules jointures SQL nécessaires.
+- **Reproductibilité** : disposer d'un artefact SQLite intermédiaire permet de relancer la fusion ou de rejouer des étapes spécifiques sans retraiter les JSON bruts.
+
 ## Liste des tables finales
 
 - `unite_legale`

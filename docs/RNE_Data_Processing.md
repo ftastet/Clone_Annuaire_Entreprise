@@ -3,8 +3,11 @@
 
 ## 1. Résumé exécutif
 Le pipeline RNE industrialise la collecte du stock initial INPI et des flux différentiels quotidiens, les valide via Pydantic, les normalise et les consolide dans une base SQLite versionnée (`rne_<date>.db.gz`) stockée sur MinIO. 
+
 Cette base est ensuite utilisée dans l’ETL SIRENE pour enrichir les tables dirigeants, unités légales, sièges et immatriculations. 
-Des garde-fous — dédoublonnage, upsert par SIREN, contrôles volumétriques, exclusion du dernier fichier de flux, notifications Mattermost — garantissent la cohérence des données. 
+
+Des garde-fous — dédoublonnage, upsert par SIREN, contrôles volumétriques, exclusion du dernier fichier de flux, notifications Mattermost — garantissent la cohérence des données.
+
 Le traitement complet s’appuie sur Airflow, MinIO, SQLite, Pydantic, pandas et un client API robuste gérant pagination `searchAfter`, retries et régulation dynamique du `pageSize`.
 
 ## 2. Vue d’ensemble du pipeline
